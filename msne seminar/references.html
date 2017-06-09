@@ -1,0 +1,782 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<title>MSNE Debating Seminar - List of References</title>
+<meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+<script type="text/javascript">
+<!--
+// QuickSearch script for JabRef HTML export 
+// Version: 3.0
+//
+// Copyright (c) 2006-2011, Mark Schenk
+//
+// This software is distributed under a Creative Commons Attribution 3.0 License
+// http://creativecommons.org/licenses/by/3.0/
+//
+// Features:
+// - intuitive find-as-you-type searching
+//    ~ case insensitive
+//    ~ ignore diacritics (optional)
+//
+// - search with/without Regular Expressions
+// - match BibTeX key
+//
+
+// Search settings
+var searchAbstract = true;	// search in abstract
+var searchReview = true;	// search in review
+
+var noSquiggles = true; 	// ignore diacritics when searching
+var searchRegExp = false; 	// enable RegExp searches
+
+
+if (window.addEventListener) {
+	window.addEventListener("load",initSearch,false); }
+else if (window.attachEvent) {
+	window.attachEvent("onload", initSearch); }
+
+function initSearch() {
+	// check for quick search table and searchfield
+	if (!document.getElementById('qs_table')||!document.getElementById('quicksearch')) { return; }
+
+	// load all the rows and sort into arrays
+	loadTableData();
+	
+	//find the query field
+	qsfield = document.getElementById('qs_field');
+
+	// previous search term; used for speed optimisation
+	prevSearch = '';
+
+	//find statistics location
+	stats = document.getElementById('stat');
+	setStatistics(-1);
+	
+	// set up preferences
+	initPreferences();
+
+	// shows the searchfield
+	document.getElementById('quicksearch').style.display = 'block';
+	document.getElementById('qs_field').onkeyup = quickSearch;
+}
+
+function loadTableData() {
+	// find table and appropriate rows
+	searchTable = document.getElementById('qs_table');
+	var allRows = searchTable.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
+
+	// split all rows into entryRows and infoRows (e.g. abstract, review, bibtex)
+	entryRows = new Array(); infoRows = new Array(); absRows = new Array(); revRows = new Array();
+
+	// get data from each row
+	entryRowsData = new Array(); absRowsData = new Array(); revRowsData = new Array(); 
+	
+	BibTeXKeys = new Array();
+	
+	for (var i=0, k=0, j=0; i<allRows.length;i++) {
+		if (allRows[i].className.match(/entry/)) {
+			entryRows[j] = allRows[i];
+			entryRowsData[j] = stripDiacritics(getTextContent(allRows[i]));
+			allRows[i].id ? BibTeXKeys[j] = allRows[i].id : allRows[i].id = 'autokey_'+j;
+			j ++;
+		} else {
+			infoRows[k++] = allRows[i];
+			// check for abstract/review
+			if (allRows[i].className.match(/abstract/)) {
+				absRows.push(allRows[i]);
+				absRowsData[j-1] = stripDiacritics(getTextContent(allRows[i]));
+			} else if (allRows[i].className.match(/review/)) {
+				revRows.push(allRows[i]);
+				revRowsData[j-1] = stripDiacritics(getTextContent(allRows[i]));
+			}
+		}
+	}
+	//number of entries and rows
+	numEntries = entryRows.length;
+	numInfo = infoRows.length;
+	numAbs = absRows.length;
+	numRev = revRows.length;
+}
+
+function quickSearch(){
+	
+	tInput = qsfield;
+
+	if (tInput.value.length == 0) {
+		showAll();
+		setStatistics(-1);
+		qsfield.className = '';
+		return;
+	} else {
+		t = stripDiacritics(tInput.value);
+
+		if(!searchRegExp) { t = escapeRegExp(t); }
+			
+		// only search for valid RegExp
+		try {
+			textRegExp = new RegExp(t,"i");
+			closeAllInfo();
+			qsfield.className = '';
+		}
+			catch(err) {
+			prevSearch = tInput.value;
+			qsfield.className = 'invalidsearch';
+			return;
+		}
+	}
+	
+	// count number of hits
+	var hits = 0;
+
+	// start looping through all entry rows
+	for (var i = 0; cRow = entryRows[i]; i++){
+
+		// only show search the cells if it isn't already hidden OR if the search term is getting shorter, then search all
+		if(cRow.className.indexOf('noshow')==-1 || tInput.value.length <= prevSearch.length){
+			var found = false; 
+
+			if (entryRowsData[i].search(textRegExp) != -1 || BibTeXKeys[i].search(textRegExp) != -1){ 
+				found = true;
+			} else {
+				if(searchAbstract && absRowsData[i]!=undefined) {
+					if (absRowsData[i].search(textRegExp) != -1){ found=true; } 
+				}
+				if(searchReview && revRowsData[i]!=undefined) {
+					if (revRowsData[i].search(textRegExp) != -1){ found=true; } 
+				}
+			}
+			
+			if (found){
+				cRow.className = 'entry show';
+				hits++;
+			} else {
+				cRow.className = 'entry noshow';
+			}
+		}
+	}
+
+	// update statistics
+	setStatistics(hits)
+	
+	// set previous search value
+	prevSearch = tInput.value;
+}
+
+
+// Strip Diacritics from text
+// http://stackoverflow.com/questions/990904/javascript-remove-accents-in-strings
+
+// String containing replacement characters for stripping accents 
+var stripstring = 
+    'AAAAAAACEEEEIIII'+
+    'DNOOOOO.OUUUUY..'+
+    'aaaaaaaceeeeiiii'+
+    'dnooooo.ouuuuy.y'+
+    'AaAaAaCcCcCcCcDd'+
+    'DdEeEeEeEeEeGgGg'+
+    'GgGgHhHhIiIiIiIi'+
+    'IiIiJjKkkLlLlLlL'+
+    'lJlNnNnNnnNnOoOo'+
+    'OoOoRrRrRrSsSsSs'+
+    'SsTtTtTtUuUuUuUu'+
+    'UuUuWwYyYZzZzZz.';
+
+function stripDiacritics(str){
+
+    if(noSquiggles==false){
+        return str;
+    }
+
+    var answer='';
+    for(var i=0;i<str.length;i++){
+        var ch=str[i];
+        var chindex=ch.charCodeAt(0)-192;   // Index of character code in the strip string
+        if(chindex>=0 && chindex<stripstring.length){
+            // Character is within our table, so we can strip the accent...
+            var outch=stripstring.charAt(chindex);
+            // ...unless it was shown as a '.'
+            if(outch!='.')ch=outch;
+        }
+        answer+=ch;
+    }
+    return answer;
+}
+
+// http://stackoverflow.com/questions/3446170/escape-string-for-use-in-javascript-regex
+// NOTE: must escape every \ in the export code because of the JabRef Export...
+function escapeRegExp(str) {
+  return str.replace(/[-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, "\\$&");
+}
+
+function toggleInfo(articleid,info) {
+
+	var entry = document.getElementById(articleid);
+	var abs = document.getElementById('abs_'+articleid);
+	var rev = document.getElementById('rev_'+articleid);
+	var bib = document.getElementById('bib_'+articleid);
+	
+	if (abs && info == 'abstract') {
+		abs.className.indexOf('noshow') == -1?abs.className = 'abstract noshow':abs.className = 'abstract show';
+	} else if (rev && info == 'review') {
+		rev.className.indexOf('noshow') == -1?rev.className = 'review noshow':rev.className = 'review show';
+	} else if (bib && info == 'bibtex') {
+		bib.className.indexOf('noshow') == -1?bib.className = 'bibtex noshow':bib.className = 'bibtex show';
+	} else { 
+		return;
+	}
+
+	// check if one or the other is available
+	var revshow; var absshow; var bibshow;
+	(abs && abs.className.indexOf('noshow') == -1)? absshow = true: absshow = false;
+	(rev && rev.className.indexOf('noshow') == -1)? revshow = true: revshow = false;	
+	(bib && bib.className.indexOf('noshow') == -1)? bibshow = true: bibshow = false;
+	
+	// highlight original entry
+	if(entry) {
+		if (revshow || absshow || bibshow) {
+		entry.className = 'entry highlight show';
+		} else {
+		entry.className = 'entry show';
+		}
+	}
+	
+	// When there's a combination of abstract/review/bibtex showing, need to add class for correct styling
+	if(absshow) {
+		(revshow||bibshow)?abs.className = 'abstract nextshow':abs.className = 'abstract';
+	} 
+	if (revshow) {
+		bibshow?rev.className = 'review nextshow': rev.className = 'review';
+	}	
+	
+}
+
+function setStatistics (hits) {
+	if(hits < 0) { hits=numEntries; }
+	if(stats) { stats.firstChild.data = hits + '/' + numEntries}
+}
+
+function getTextContent(node) {
+	// Function written by Arve Bersvendsen
+	// http://www.virtuelvis.com
+	
+	if (node.nodeType == 3) {
+	return node.nodeValue;
+	} // text node
+	if (node.nodeType == 1 && node.className != "infolinks") { // element node
+	var text = [];
+	for (var chld = node.firstChild;chld;chld=chld.nextSibling) {
+		text.push(getTextContent(chld));
+	}
+	return text.join("");
+	} return ""; // some other node, won't contain text nodes.
+}
+
+function showAll(){
+	closeAllInfo();
+	for (var i = 0; i < numEntries; i++){ entryRows[i].className = 'entry show'; }
+}
+
+function closeAllInfo(){
+	for (var i=0; i < numInfo; i++){
+		if (infoRows[i].className.indexOf('noshow') ==-1) {
+			infoRows[i].className = infoRows[i].className + ' noshow';
+		}
+	}
+}
+
+function clearQS() {
+	qsfield.value = '';
+	showAll();
+}
+
+function redoQS(){
+	showAll();
+	quickSearch(qsfield);
+}
+
+function updateSetting(obj){
+	var option = obj.id;
+	var checked = obj.value;
+
+	switch(option)
+	 {
+	 case "opt_searchAbs":
+	   searchAbstract=!searchAbstract;
+	   redoQS();
+	   break;
+	 case "opt_searchRev":
+	   searchReview=!searchReview;
+	   redoQS();
+	   break;
+	 case "opt_useRegExp":
+	   searchRegExp=!searchRegExp;
+	   redoQS();
+	   break;
+	 case "opt_noAccents":
+	   noSquiggles=!noSquiggles;
+	   loadTableData();
+	   redoQS();
+	   break;
+	 }
+}
+
+function initPreferences(){
+	if(searchAbstract){document.getElementById("opt_searchAbs").checked = true;}
+	if(searchReview){document.getElementById("opt_searchRev").checked = true;}
+	if(noSquiggles){document.getElementById("opt_noAccents").checked = true;}
+	if(searchRegExp){document.getElementById("opt_useRegExp").checked = true;}
+	
+	if(numAbs==0) {document.getElementById("opt_searchAbs").parentNode.style.display = 'none';}
+	if(numRev==0) {document.getElementById("opt_searchRev").parentNode.style.display = 'none';}
+}
+
+function toggleSettings(){
+	var togglebutton = document.getElementById('showsettings');
+	var settings = document.getElementById('settings');
+	
+	if(settings.className == "hidden"){
+		settings.className = "show";
+		togglebutton.innerText = "close settings";
+		togglebutton.textContent = "close settings";
+	}else{
+		settings.className = "hidden";
+		togglebutton.innerText = "settings...";		
+		togglebutton.textContent = "settings...";
+	}
+}
+
+-->
+</script>
+<style type="text/css">
+body { background-color: white; font-family: Arial, sans-serif; font-size: 13px; line-height: 1.2; padding: 1em; color: #2E2E2E; margin: auto 2em; }
+
+form#quicksearch { width: auto; border-style: solid; border-color: gray; border-width: 1px 0px; padding: 0.7em 0.5em; display:none; position:relative; }
+span#searchstat {padding-left: 1em;}
+
+div#settings { margin-top:0.7em; /* border-bottom: 1px transparent solid; background-color: #efefef; border: 1px grey solid; */ }
+div#settings ul {margin: 0; padding: 0; }
+div#settings li {margin: 0; padding: 0 1em 0 0; display: inline; list-style: none; }
+div#settings li + li { border-left: 2px #efefef solid; padding-left: 0.5em;}
+div#settings input { margin-bottom: 0px;}
+
+div#settings.hidden {display:none;}
+
+#showsettings { border: 1px grey solid; padding: 0 0.5em; float:right; line-height: 1.6em; text-align: right; }
+#showsettings:hover { cursor: pointer; }
+
+.invalidsearch { background-color: red; }
+input[type="button"] { background-color: #efefef; border: 1px #2E2E2E solid;}
+
+table { width: 100%; empty-cells: show; border-spacing: 0em 0.2em; margin: 1em 0em; border-style: none; }
+th, td { border: 1px gray solid; border-width: 1px 1px; padding: 0.5em; vertical-align: top; text-align: left; }
+th { background-color: #efefef; }
+td + td, th + th { border-left: none; }
+
+td a { color: navy; text-decoration: none; }
+td a:hover  { text-decoration: underline; }
+
+tr.noshow { display: none;}
+tr.highlight td { background-color: #EFEFEF; border-top: 2px #2E2E2E solid; font-weight: bold; }
+tr.abstract td, tr.review td, tr.bibtex td { background-color: #EFEFEF; text-align: justify; border-bottom: 2px #2E2E2E solid; }
+tr.nextshow td { border-bottom: 1px gray solid; }
+
+tr.bibtex pre { width: 100%; overflow: auto; white-space: pre-wrap;}
+p.infolinks { margin: 0.3em 0em 0em 0em; padding: 0px; }
+
+@media print {
+	p.infolinks, #qs_settings, #quicksearch, t.bibtex { display: none !important; }
+	tr { page-break-inside: avoid; }
+}
+</style>
+</head>
+<body>
+
+<form action="" id="quicksearch">
+<input type="text" id="qs_field" autocomplete="off" placeholder="Type to search..." /> <input type="button" onclick="clearQS()" value="clear" />
+<span id="searchstat">Matching entries: <span id="stat">0</span></span>
+<div id="showsettings" onclick="toggleSettings()">settings...</div>
+<div id="settings" class="hidden">
+<ul>
+<li><input type="checkbox" class="search_setting" id="opt_searchAbs" onchange="updateSetting(this)"><label for="opt_searchAbs"> include abstract</label></li>
+<li><input type="checkbox" class="search_setting" id="opt_searchRev" onchange="updateSetting(this)"><label for="opt_searchRev"> include review</label></li>
+<li><input type="checkbox" class="search_setting" id="opt_useRegExp" onchange="updateSetting(this)"><label for="opt_useRegExp"> use RegExp</label></li>
+<li><input type="checkbox" class="search_setting" id="opt_noAccents" onchange="updateSetting(this)"><label for="opt_noAccents"> ignore accents</label></li>
+</ul>
+</div>
+</form>
+<table id="qs_table" border="1">
+<thead><tr><th width="20%">Author</th><th width="30%">Title</th><th width="5%">Year</th><th width="30%">Journal/Proceedings</th><th width="10%">Reftype</th><th width="5%">DOI/URL</th></tr></thead>
+<tbody><tr id="Bhagat2016" class="entry">
+	<td>Bhagat, N.A., Venkatakrishnan, A., Abibullaev, B., Artz, E.J., Yozbatiran, N., Blank, A.A., French, J., Karmonik, C., Grossman, R.G., O'Malley, M.K. and Others</td>
+	<td>Design and optimization of an EEG-based brain machine interface (BMI) to an upper-limb exoskeleton for stroke survivors <p class="infolinks">[<a href="javascript:toggleInfo('Bhagat2016','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('Bhagat2016','bibtex')">BibTeX</a>]</p></td>
+	<td>2016</td>
+	<td>Frontiers in neuroscience<br/>Vol. 10&nbsp;</td>
+	<td>article</td>
+	<td><a href="http://dx.doi.org/10.3389/fnins.2016.00122">DOI</a> &nbsp;</td>
+</tr>
+<tr id="abs_Bhagat2016" class="abstract noshow">
+	<td colspan="6"><b>Abstract</b>: This study demonstrates the feasibility of detecting motor intent from brain activity of chronic stroke patients using an asynchronous electroencephalography (EEG)-based brain machine interface (BMI). Intent was inferred from movement related cortical potentials (MRCPs) measured over an optimized set of EEG electrodes. Successful intent detection triggered the motion of an upper-limb exoskeleton (MAHI Exo-II), to guide movement and to encourage active user participation by providing instantaneous sensory feedback. Several BMI design features were optimized to increase system performance in the presence of single-trial variability of MRCPs in the injured brain: (1) an adaptive time window was used for extracting features during BMI calibration; (2) training data from two consecutive days were pooled for BMI calibration to increase robustness to handle the day-to-day variations typical of EEG, and (3) BMI predictions were gated by residual electromyography (EMG) activity from the impaired arm, to reduce the number of false positives. This patient-specific BMI calibration approach can accommodate a broad spectrum of stroke patients with diverse motor capabilities. Following BMI optimization on day 3, testing of the closed-loop BMI-MAHI exoskeleton, on 4th and 5th days of the study, showed consistent BMI performance with overall mean true positive rate (TPR) = 62.7 Â± 21.4% on day 4 and 67.1 Â± 14.6% on day 5. The overall false positive rate (FPR) across subjects was 27.74 Â± 37.46% on day 4 and 27.5 Â± 35.64% on day 5; however for two subjects who had residual motor function and could benefit from the EMG-gated BMI, the mean FPR was quite low (textless 10%). On average, motor intent was detected -367 Â± 328 ms before movement onset during closed-loop operation. These findings provide evidence that closed-loop EEG-based BMI for stroke patients can be designed and optimized to perform well across multiple days without system recalibration.</td>
+</tr>
+<tr id="bib_Bhagat2016" class="bibtex noshow">
+<td colspan="6"><b>BibTeX</b>:
+<pre>
+@article{Bhagat2016,
+  author = {Bhagat, Nikunj A and Venkatakrishnan, Anusha and Abibullaev, Berdakh and Artz, Edward J and Yozbatiran, Nuray and Blank, Amy A and French, James and Karmonik, Christof and Grossman, Robert G and O'Malley, Marcia K and Others},
+  title = {Design and optimization of an EEG-based brain machine interface (BMI) to an upper-limb exoskeleton for stroke survivors},
+  journal = {Frontiers in neuroscience},
+  publisher = {Frontiers Media SA},
+  year = {2016},
+  volume = {10},
+  doi = {http://dx.doi.org/10.3389/fnins.2016.00122}
+}
+</pre></td>
+</tr>
+<tr id="Brunner2015" class="entry">
+	<td>Brunner, C., Birbaumer, N., Blankertz, B., Guger, C., K&uuml;bler, A., Mattia, D., Mill&aacute;n, J.d.R., Miralles, F., Nijholt, A., Opisso, E., Ramsey, N., Salomon, P., M&uuml;ller-Putz, G.R. and Others</td>
+	<td>BNCI Horizon 2020: towards a roadmap for the BCI community <p class="infolinks">[<a href="javascript:toggleInfo('Brunner2015','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('Brunner2015','bibtex')">BibTeX</a>]</p></td>
+	<td>2015</td>
+	<td>Brain-computer interfaces<br/>Vol. 2(1), pp. 1-10&nbsp;</td>
+	<td>article</td>
+	<td><a href="http://dx.doi.org/10.1080/2326263X.2015.1008956">DOI</a> &nbsp;</td>
+</tr>
+<tr id="abs_Brunner2015" class="abstract noshow">
+	<td colspan="6"><b>Abstract</b>: The brain-computer interface (BCI) field has grown dramatically over the past few years, but there are still no coordinated efforts to ensure efficient communication and collaboration among key stakeholders. The European Commission (EC) has recently renewed their efforts to establish such a coordination effort by funding a coordination and support action for the BCI community called âBNCI Horizon 2020' after the âFuture BNCI' project. Major goals of this new project include developing a roadmap for the next decade and beyond, encouraging discussion and collaboration within the BCI community, fostering communication with the general public, and the foundation of an international BCI Society. We present a short overview of current and past EU-funded BCI projects and provide evidence of a growing research and industrial community. Efficient communication also entails the establishment of clear terminology, which is a major goal of BNCI Horizon 2020. To this end, we give a brief overview of current BCI-related terms and definitions. A major networking activity in the project was the BNCI Horizon 2020 Retreat in Hallstatt, Austria. Over 60 experts participated in this event to discuss the future of the BCI field in a series of plenary talks, targeted discussions, and parallel focus sessions. A follow-up event was the EU BCI Day at the 6th International Brain-Computer Interface Conference in Graz, Austria. This networking event included plenary talks by eight companies and representatives from all seven ongoing EU research projects, poster presentations, demos, and discussions. Another goal of BNCI Horizon 2020 is the foundation of an official BCI Society. In this article, we summarize the current status of this process. Finally, we present visions for future BCI applications developed within BNCI Horizon 2020 using input from external BCI experts as well. We identify common themes and conclude with six exemplary use cases.</td>
+</tr>
+<tr id="bib_Brunner2015" class="bibtex noshow">
+<td colspan="6"><b>BibTeX</b>:
+<pre>
+@article{Brunner2015,
+  author = {Brunner, Clemens and Birbaumer, Niels and Blankertz, Benjamin and Guger, Christoph and K&uuml;bler, Andrea and Mattia, Donatella and Mill&aacute;n, Jos&eacute; del R. and Miralles, Felip and Nijholt, Anton and Opisso, Eloy and Ramsey, Nick and Salomon, Patric and M&uuml;ller-Putz, Gernot R. and Others},
+  title = {BNCI Horizon 2020: towards a roadmap for the BCI community},
+  journal = {Brain-computer interfaces},
+  publisher = {Taylor &amp; Francis},
+  year = {2015},
+  volume = {2},
+  number = {1},
+  pages = {1--10},
+  doi = {http://dx.doi.org/10.1080/2326263X.2015.1008956}
+}
+</pre></td>
+</tr>
+<tr id="Carmena2003" class="entry">
+	<td>Carmena, J.M., Lebedev, M.A., Crist, R.E., O'Doherty, J.E., Santucci, D.M., Dimitrov, D.F., Patil, P.G., Henriquez, C.S. and Nicolelis, M.A.L.</td>
+	<td>Learning to control a brain-machine interface for reaching and grasping by primates <p class="infolinks">[<a href="javascript:toggleInfo('Carmena2003','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('Carmena2003','bibtex')">BibTeX</a>]</p></td>
+	<td>2003</td>
+	<td>PLoS Biology<br/>Vol. 1(2), pp. e42&nbsp;</td>
+	<td>article</td>
+	<td><a href="http://dx.doi.org/10.1371/journal.pbio.0000042">DOI</a> &nbsp;</td>
+</tr>
+<tr id="abs_Carmena2003" class="abstract noshow">
+	<td colspan="6"><b>Abstract</b>: Reaching and grasping in primates depend on the coordination of neural activity in large frontoparietal ensembles. Here we demonstrate that primates can learn to reach and grasp virtual objects by controlling a robot arm through a closed-loop brain-machine interface (BMIc) that uses multiple mathematical models to extract several motor parameters (i.e., hand position, velocity, gripping force, and the EMGs of multiple arm muscles) from the electrical activity of frontoparietal neuronal ensembles. As single neurons typically contribute to the encoding of several motor parameters, we observed that high BMIc accuracy required recording from large neuronal ensembles. Continuous BMIc operation by monkeys led to significant improvements in both model predictions and behavioral performance. Using visual feedback, monkeys succeeded in producing robot reach-and-grasp movements even when their arms did not move. Learning to operate the BMIc was paralleled by functional reorganization in multiple cortical areas, suggesting that the dynamic properties of the BMIc were incorporated into motor and sensory cortical representations.</td>
+</tr>
+<tr id="bib_Carmena2003" class="bibtex noshow">
+<td colspan="6"><b>BibTeX</b>:
+<pre>
+@article{Carmena2003,
+  author = {Carmena, Jose M and Lebedev, Mikhail A and Crist, Roy E and O'Doherty, Joseph E and Santucci, David M and Dimitrov, Dragan F and Patil, Parag G and Henriquez, Craig S and Nicolelis, Miguel A L},
+  title = {Learning to control a brain-machine interface for reaching and grasping by primates},
+  journal = {PLoS Biology},
+  publisher = {Public Library of Science},
+  year = {2003},
+  volume = {1},
+  number = {2},
+  pages = {e42},
+  doi = {http://dx.doi.org/10.1371/journal.pbio.0000042}
+}
+</pre></td>
+</tr>
+<tr id="Daly2008" class="entry">
+	<td>Daly, J.J. and Wolpaw, J.R.</td>
+	<td>Brain-computer interfaces in neurological rehabilitation <p class="infolinks">[<a href="javascript:toggleInfo('Daly2008','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('Daly2008','bibtex')">BibTeX</a>]</p></td>
+	<td>2008</td>
+	<td>The Lancet Neurology<br/>Vol. 7(11), pp. 1032-1043&nbsp;</td>
+	<td>article</td>
+	<td><a href="http://dx.doi.org/10.1016/S1474">DOI</a> &nbsp;</td>
+</tr>
+<tr id="abs_Daly2008" class="abstract noshow">
+	<td colspan="6"><b>Abstract</b>: Recent advances in analysis of brain signals, training patients to control these signals, and improved computing capabilities have enabled people with severe motor disabilities to use their brain signals for communication and control of objects in their environment, thereby bypassing their impaired neuromuscular system. Non-invasive, electroencephalogram (EEG)-based brainâcomputer interface (BCI) technologies can be used to control a computer cursor or a limb orthosis, for word processing and accessing the internet, and for other functions such as environmental control or entertainment. By re-establishing some independence, BCI technologies can substantially improve the lives of people with devastating neurological disorders such as advanced amyotrophic lateral sclerosis. BCI technology might also restore more eff ective motor control to people after stroke or other traumatic brain disorders by helping to guide activity-dependent brain plasticity by use of EEG brain signals to indicate to the patient the current state of brain activity and to enable the user to subsequently lower abnormal activity. Alternatively, by use of brain signals to supplement impaired muscle control, BCIs might increase the effi cacy of a rehabilitation protocol and thus improve muscle control for the patient.</td>
+</tr>
+<tr id="bib_Daly2008" class="bibtex noshow">
+<td colspan="6"><b>BibTeX</b>:
+<pre>
+@article{Daly2008,
+  author = {Daly, Janis J and Wolpaw, Jonathan R},
+  title = {Brain-computer interfaces in neurological rehabilitation},
+  journal = {The Lancet Neurology},
+  publisher = {Elsevier},
+  year = {2008},
+  volume = {7},
+  number = {11},
+  pages = {1032--1043},
+  doi = {http://dx.doi.org/10.1016/S1474}
+}
+</pre></td>
+</tr>
+<tr id="Donati2016" class="entry">
+	<td>Donati, A.R.C., Shokur, S., Morya, E., Campos, D.S.F., Moioli, R.C., Gitti, C.M., Augusto, P.B., Tripodi, S., Pires, C.G., Pereira, G.A. and Others</td>
+	<td>Long-term training with a brain-machine interface-based gait protocol induces partial neurological recovery in paraplegic patients <p class="infolinks">[<a href="javascript:toggleInfo('Donati2016','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('Donati2016','bibtex')">BibTeX</a>]</p></td>
+	<td>2016</td>
+	<td>Scientific reports<br/>Vol. 6&nbsp;</td>
+	<td>article</td>
+	<td><a href="http://dx.doi.org/10.1038/srep30383">DOI</a> &nbsp;</td>
+</tr>
+<tr id="abs_Donati2016" class="abstract noshow">
+	<td colspan="6"><b>Abstract</b>: 1,3,6,10,11,12 Brain-machine interfaces (BMIs) provide a new assistive strategy aimed at restoring mobility in severely paralyzed patients. Yet, no study in animals or in human subjects has indicated that long-term BMI training could induce any type of clinical recovery. Eight chronic (3â13 years) spinal cord injury (SCI) paraplegics were subjected to long-term training (12 months) with a multi-stage BMI-based gait neurorehabilitation paradigm aimed at restoring locomotion. This paradigm combined intense immersive virtual reality training, enriched visual-tactile feedback, and walking with two EEG-controlled robotic actuators, including a custom-designed lower limb exoskeleton capable of delivering tactile feedback to subjects. Following 12 months of training with this paradigm, all eight patients experienced neurological improvements in somatic sensation (pain localization, fine/crude touch, and proprioceptive sensing) in multiple dermatomes. Patients also regained voluntary motor control in key muscles below the SCI level, as measured by EMGs, resulting in marked improvement in their walking index. As a result, 50% of these patients were upgraded to an incomplete paraplegia classification. Neurological recovery was paralleled by the reemergence of lower limb motor imagery at cortical level. We hypothesize that this unprecedented neurological recovery results from both cortical and spinal cord plasticity triggered by long-term BMI usage. Spinal Cord Injury (SCI) rehabilitation remains a major clinical challenge, especially in cases involving chronic complete injury. Clinical studies using body weight support systems 1,2 , robotic assistance 1â4 , and functional elec-trostimulation of the leg 5,6 have proposed potential solutions for assisting SCI patients in walking 7,8 . Yet, none of these approaches have generated any consistent clinical improvement in neurological functions, namely soma-tosensory (tactile, proprioceptive, pain, and temperature) perception and voluntary motor control, below the level of the spinal cord lesion.</td>
+</tr>
+<tr id="bib_Donati2016" class="bibtex noshow">
+<td colspan="6"><b>BibTeX</b>:
+<pre>
+@article{Donati2016,
+  author = {Donati, Ana R C and Shokur, Solaiman and Morya, Edgard and Campos, Debora S F and Moioli, Renan C and Gitti, Claudia M and Augusto, Patricia B and Tripodi, Sandra and Pires, Cristhiane G and Pereira, Gislaine A and Others},
+  title = {Long-term training with a brain-machine interface-based gait protocol induces partial neurological recovery in paraplegic patients},
+  journal = {Scientific reports},
+  publisher = {Nature Publishing Group},
+  year = {2016},
+  volume = {6},
+  doi = {http://dx.doi.org/10.1038/srep30383}
+}
+</pre></td>
+</tr>
+<tr id="Downey2016" class="entry">
+	<td>Downey, J.E., Weiss, J.M., Muelling, K., Venkatraman, A., Valois, J.-S., Hebert, M., Bagnell, J.A., Schwartz, A.B. and Collinger, J.L.</td>
+	<td>Blending of brain-machine interface and vision-guided autonomous robotics improves neuroprosthetic arm performance during grasping <p class="infolinks">[<a href="javascript:toggleInfo('Downey2016','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('Downey2016','bibtex')">BibTeX</a>]</p></td>
+	<td>2016</td>
+	<td>Journal of neuroengineering and rehabilitation<br/>Vol. 13(1), pp. 28&nbsp;</td>
+	<td>article</td>
+	<td><a href="http://dx.doi.org/10.1186/s12984-016-0134-9">DOI</a> &nbsp;</td>
+</tr>
+<tr id="abs_Downey2016" class="abstract noshow">
+	<td colspan="6"><b>Abstract</b>: BACKGROUND: Recent studies have shown that brain-machine interfaces (BMIs) offer great potential for restoring upper limb function. However, grasping objects is a complicated task and the signals extracted from the brain may not always be capable of driving these movements reliably. Vision-guided robotic assistance is one possible way to improve BMI performance. We describe a method of shared control where the user controls a prosthetic arm using a BMI and receives assistance with positioning the hand when it approaches an object.$n$nMETHODS: Two human subjects with tetraplegia used a robotic arm to complete object transport tasks with and without shared control. The shared control system was designed to provide a balance between BMI-derived intention and computer assistance. An autonomous robotic grasping system identified and tracked objects and defined stable grasp positions for these objects. The system identified when the user intended to interact with an object based on the BMI-controlled movements of the robotic arm. Using shared control, BMI controlled movements and autonomous grasping commands were blended to ensure secure grasps.$n$nRESULTS: Both subjects were more successful on object transfer tasks when using shared control compared to BMI control alone. Movements made using shared control were more accurate, more efficient, and less difficult. One participant attempted a task with multiple objects and successfully lifted one of two closely spaced objects in 92 % of trials, demonstrating the potential for users to accurately execute their intention while using shared control.$n$nCONCLUSIONS: Integration of BMI control with vision-guided robotic assistance led to improved performance on object transfer tasks. Providing assistance while maintaining generalizability will make BMI systems more attractive to potential users.$n$nTRIAL REGISTRATION: NCT01364480 and NCT01894802 .</td>
+</tr>
+<tr id="bib_Downey2016" class="bibtex noshow">
+<td colspan="6"><b>BibTeX</b>:
+<pre>
+@article{Downey2016,
+  author = {Downey, John E and Weiss, Jeffrey M and Muelling, Katharina and Venkatraman, Arun and Valois, Jean-Sebastien and Hebert, Martial and Bagnell, J Andrew and Schwartz, Andrew B and Collinger, Jennifer L},
+  title = {Blending of brain-machine interface and vision-guided autonomous robotics improves neuroprosthetic arm performance during grasping},
+  journal = {Journal of neuroengineering and rehabilitation},
+  publisher = {BioMed Central},
+  year = {2016},
+  volume = {13},
+  number = {1},
+  pages = {28},
+  doi = {http://dx.doi.org/10.1186/s12984-016-0134-9}
+}
+</pre></td>
+</tr>
+<tr id="Hochberg2006" class="entry">
+	<td>Hochberg, L.R., Serruya, M.D., Friehs, G.M., Mukand, J.A., Saleh, M., Caplan, A.H., Branner, A., Chen, D., Penn, R.D. and Donoghue, J.P.</td>
+	<td>Neuronal ensemble control of prosthetic devices by a human with tetraplegia <p class="infolinks">[<a href="javascript:toggleInfo('Hochberg2006','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('Hochberg2006','bibtex')">BibTeX</a>]</p></td>
+	<td>2006</td>
+	<td>Nature<br/>Vol. 442(7099), pp. 164-171&nbsp;</td>
+	<td>article</td>
+	<td><a href="http://dx.doi.org/10.1038/nature04970">DOI</a> &nbsp;</td>
+</tr>
+<tr id="abs_Hochberg2006" class="abstract noshow">
+	<td colspan="6"><b>Abstract</b>: Neuromotor prostheses (NMPs) aim to replace or restore lost motor functions in paralysed humans by routeing movement-related signals from the brain, around damaged parts of the nervous system, to external effectors. To translate preclinical results from intact animals to a clinically useful NMP, movement signals must persist in cortex after spinal cord injury and be engaged by movement intent when sensory inputs and limb movement are long absent. Furthermore, NMPs would require that intention-driven neuronal activity be converted into a control signal that enables useful tasks. Here we show initial results for a tetraplegic human (MN) using a pilot NMP. Neuronal ensemble activity recorded through a 96-microelectrode array implanted in primary motor cortex demonstrated that intended hand motion modulates cortical spiking patterns three years after spinal cord injury. Decoders were created, providing a 'neural cursor' with which MN opened simulated e-mail and operated devices such as a television, even while conversing. Furthermore, MN used neural control to open and close a prosthetic hand, and perform rudimentary actions with a multi-jointed robotic arm. These early results suggest that NMPs based upon intracortical neuronal ensemble spiking activity could provide a valuable new neurotechnology to restore independence for humans with paralysis.</td>
+</tr>
+<tr id="bib_Hochberg2006" class="bibtex noshow">
+<td colspan="6"><b>BibTeX</b>:
+<pre>
+@article{Hochberg2006,
+  author = {Hochberg, Leigh R and Serruya, Mijail D and Friehs, Gerhard M and Mukand, Jon A and Saleh, Maryam and Caplan, Abraham H and Branner, Almut and Chen, David and Penn, Richard D and Donoghue, John P},
+  title = {Neuronal ensemble control of prosthetic devices by a human with tetraplegia},
+  journal = {Nature},
+  publisher = {Nature Publishing Group},
+  year = {2006},
+  volume = {442},
+  number = {7099},
+  pages = {164--171},
+  doi = {http://dx.doi.org/10.1038/nature04970}
+}
+</pre></td>
+</tr>
+<tr id="Iturrate2015" class="entry">
+	<td>Iturrate, I&ntilde;., Chavarriaga, R., Montesano, L., Minguez, J. and Mill&aacute;n, J.d.R.</td>
+	<td>Teaching brain-machine interfaces as an alternative paradigm to neuroprosthetics control <p class="infolinks">[<a href="javascript:toggleInfo('Iturrate2015','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('Iturrate2015','bibtex')">BibTeX</a>]</p></td>
+	<td>2015</td>
+	<td>Scientific reports<br/>Vol. 5, pp. 13893&nbsp;</td>
+	<td>article</td>
+	<td><a href="http://dx.doi.org/10.1038/srep13893">DOI</a> &nbsp;</td>
+</tr>
+<tr id="abs_Iturrate2015" class="abstract noshow">
+	<td colspan="6"><b>Abstract</b>: Brain-machine interfaces (BMI) usually decode movement parameters from cortical activity to control neuroprostheses. This requires subjects to learn to modulate their brain activity to convey all necessary information, thus imposing natural limits on the complexity of tasks that can be performed. Here we demonstrate an alternative and complementary BMI paradigm that overcomes that limitation by decoding cognitive brain signals associated with monitoring processes relevant for achieving goals. In our approach the neuroprosthesis executes actions that the subject evaluates as erroneous or correct, and exploits the brain correlates of this assessment to learn suitable motor behaviours. Results show that, after a short user's training period, this teaching BMI paradigm operated three different neuroprostheses and generalized across several targets. Our results further support that these error-related signals reflect a task-independent monitoring mechanism in the brain, making this teaching paradigm scalable. We anticipate this BMI approach to become a key component of any neuroprosthesis that mimics natural motor control as it enables continuous adaptation in the absence of explicit information about goals. Furthermore, our paradigm can seamlessly incorporate other cognitive signals and conventional neuroprosthetic approaches, invasive or non-invasive, to enlarge the range and complexity of tasks that can be accomplished.</td>
+</tr>
+<tr id="bib_Iturrate2015" class="bibtex noshow">
+<td colspan="6"><b>BibTeX</b>:
+<pre>
+@article{Iturrate2015,
+  author = {Iturrate, I&ntilde;aki and Chavarriaga, Ricardo and Montesano, Luis and Minguez, Javier and Mill&aacute;n, Jos&eacute; del R},
+  title = {Teaching brain-machine interfaces as an alternative paradigm to neuroprosthetics control},
+  journal = {Scientific reports},
+  publisher = {Nature Publishing Group},
+  year = {2015},
+  volume = {5},
+  pages = {13893},
+  doi = {http://dx.doi.org/10.1038/srep13893}
+}
+</pre></td>
+</tr>
+<tr id="Lebedev2006" class="entry">
+	<td>Lebedev, M.A. and Nicolelis, M.A.L.</td>
+	<td>Brain-machine interfaces: past, present and future <p class="infolinks">[<a href="javascript:toggleInfo('Lebedev2006','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('Lebedev2006','bibtex')">BibTeX</a>]</p></td>
+	<td>2006</td>
+	<td>TRENDS in Neurosciences<br/>Vol. 29(9), pp. 536-546&nbsp;</td>
+	<td>article</td>
+	<td><a href="http://dx.doi.org/10.1016/j.tins.2006.07.004">DOI</a> &nbsp;</td>
+</tr>
+<tr id="abs_Lebedev2006" class="abstract noshow">
+	<td colspan="6"><b>Abstract</b>: Since the original demonstration that electrical activity generated by ensembles of cortical neurons can be employed directly to control a robotic manipulator, research on brain-machine interfaces (BMIs) has experienced an impressive growth. Today BMIs designed for both experimental and clinical studies can translate raw neuronal signals into motor commands that reproduce arm reaching and hand grasping movements in artificial actuators. Clearly, these developments hold promise for the restoration of limb mobility in paralyzed subjects. However, as we review here, before this goal can be reached several bottlenecks have to be passed. These include designing a fully implantable biocompatible recording device, further developing real-time computational algorithms, introducing a method for providing the brain with sensory feedback from the actuators, and designing and building artificial prostheses that can be controlled directly by brain-derived signals. By reaching these milestones, future BMIs will be able to drive and control revolutionary prostheses that feel and act like the human arm. ?? 2006 Elsevier Ltd. All rights reserved.</td>
+</tr>
+<tr id="bib_Lebedev2006" class="bibtex noshow">
+<td colspan="6"><b>BibTeX</b>:
+<pre>
+@article{Lebedev2006,
+  author = {Lebedev, Mikhail A and Nicolelis, Miguel A L},
+  title = {Brain-machine interfaces: past, present and future},
+  journal = {TRENDS in Neurosciences},
+  publisher = {Elsevier},
+  year = {2006},
+  volume = {29},
+  number = {9},
+  pages = {536--546},
+  doi = {http://dx.doi.org/10.1016/j.tins.2006.07.004}
+}
+</pre></td>
+</tr>
+<tr id="Millan2010" class="entry">
+	<td>Mill&aacute;n, J.d.R., Rupp, R&uuml;., Mueller-Putz, G., Murray-Smith, R., Giugliemma, C., Tangermann, M., Vidaurre, C., Cincotti, F., Kubler, A., Leeb, R. and Others</td>
+	<td>Combining brain--computer interfaces and assistive technologies: state-of-the-art and challenges <p class="infolinks">[<a href="javascript:toggleInfo('Millan2010','bibtex')">BibTeX</a>]</p></td>
+	<td>2010</td>
+	<td>Frontiers in neuroscience<br/>Vol. 4, pp. 161&nbsp;</td>
+	<td>article</td>
+	<td>&nbsp;</td>
+</tr>
+<tr id="bib_Millan2010" class="bibtex noshow">
+<td colspan="6"><b>BibTeX</b>:
+<pre>
+@article{Millan2010,
+  author = {Mill&aacute;n, Jos&eacute; del R and Rupp, R&uuml;diger and Mueller-Putz, Gernot and Murray-Smith, Roderick and Giugliemma, Claudio and Tangermann, Michael and Vidaurre, Carmen and Cincotti, Febo and Kubler, Andrea and Leeb, Robert and Others},
+  title = {Combining brain--computer interfaces and assistive technologies: state-of-the-art and challenges},
+  journal = {Frontiers in neuroscience},
+  publisher = {Frontiers},
+  year = {2010},
+  volume = {4},
+  pages = {161}
+}
+</pre></td>
+</tr>
+<tr id="Pfurtscheller2010" class="entry">
+	<td>Pfurtscheller, G., Allison, B.Z., Bauernfeind, G&uuml;., Brunner, C., Solis Escalante, T., Scherer, R., Zander, T.O., Mueller-Putz, G., Neuper, C. and Birbaumer, N.</td>
+	<td>The hybrid BCI <p class="infolinks">[<a href="javascript:toggleInfo('Pfurtscheller2010','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('Pfurtscheller2010','bibtex')">BibTeX</a>]</p></td>
+	<td>2010</td>
+	<td>Frontiers in neuroscience<br/>Vol. 4, pp. 3&nbsp;</td>
+	<td>article</td>
+	<td><a href="http://dx.doi.org/10.3389/fnpro.2010.00003">DOI</a> &nbsp;</td>
+</tr>
+<tr id="abs_Pfurtscheller2010" class="abstract noshow">
+	<td colspan="6"><b>Abstract</b>: Nowadays, everybody knows what a hybrid car is. A hybrid car normally has two engines to enhance energy efficiency and reduce CO2 output. Similarly, a hybrid brain-computer interface (BCI) is composed of two BCIs, or at least one BCI and another system. A hybrid BCI, like any BCI, must fulfill the following four criteria: (i) the device must rely on signals recorded directly from the brain; (ii) there must be at least one recordable brain signal that the user can intentionally modulate to effect goal-directed behaviour; (iii) real time processing; and (iv) the user must obtain feedback. This paper introduces hybrid BCIs that have already been published or are in development. We also introduce concepts for future work. We describe BCIs that classify two EEG patterns: one is the event-related (de)synchronisation (ERD, ERS) of sensorimotor rhythms, and the other is the steady-state visual evoked potential (SSVEP). Hybrid BCIs can either process their inputs simultaneously, or operate two systems sequentially, where the first system can act as a "brain switch". For example, we describe a hybrid BCI that simultaneously combines ERD and SSVEP BCIs. We also describe a sequential hybrid BCI, in which subjects could use a brain switch to control an SSVEP-based hand orthosis. Subjects who used this hybrid BCI exhibited about half the false positives encountered while using the SSVEP BCI alone. A brain switch can also rely on hemodynamic changes measured through near-infrared spectroscopy (NIRS). Hybrid BCIs can also use one brain signal and a different type of input. This additional input can be an electrophysiological signal such as the heart rate, or a signal from an external device such as an eye tracking system.</td>
+</tr>
+<tr id="bib_Pfurtscheller2010" class="bibtex noshow">
+<td colspan="6"><b>BibTeX</b>:
+<pre>
+@article{Pfurtscheller2010,
+  author = {Pfurtscheller, Gert and Allison, Brendan Z and Bauernfeind, G&uuml;nther and Brunner, Clemens and Solis Escalante, Teodoro and Scherer, Reinhold and Zander, Thorsten O and Mueller-Putz, Gernot and Neuper, Christa and Birbaumer, Niels},
+  title = {The hybrid BCI},
+  journal = {Frontiers in neuroscience},
+  publisher = {Frontiers},
+  year = {2010},
+  volume = {4},
+  pages = {3},
+  doi = {http://dx.doi.org/10.3389/fnpro.2010.00003}
+}
+</pre></td>
+</tr>
+<tr id="Silvoni2011" class="entry">
+	<td>Silvoni, S., Ramos-Murguialday, A., Cavinato, M., Volpato, C., Cisotto, G., Turolla, A., Piccione, F. and Birbaumer, N.</td>
+	<td>Brain-computer interface in stroke: a review of progress <p class="infolinks">[<a href="javascript:toggleInfo('Silvoni2011','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('Silvoni2011','bibtex')">BibTeX</a>]</p></td>
+	<td>2011</td>
+	<td>Clinical EEG and Neuroscience<br/>Vol. 42(4), pp. 245-252&nbsp;</td>
+	<td>article</td>
+	<td><a href="http://dx.doi.org/10.1177/155005941104200410">DOI</a> &nbsp;</td>
+</tr>
+<tr id="abs_Silvoni2011" class="abstract noshow">
+	<td colspan="6"><b>Abstract</b>: Brain-computer interface (BCI) technology has been used for rehabilitation after stroke and there are a number of reports involving stroke patients in BCI-feedback training. Most publications have demonstrated the efficacy of BCI technology in post-stroke rehabilitation using output devices such as Functional Electrical Stimulation, robot, and orthosis. The aim of this review is to focus on the progress of BCI-based rehabilitation strategies and to underline future challenges. A brief history of clinical BCI-approaches is presented focusing on stroke motor rehabilitation. A context for three approaches of a BCI-based motor rehabilitation program is outlined: the substitutive strategy, classical conditioning and operant conditioning. Furthermore, we include an overview of a pilot study concerning a new neuro-forcefeedback strategy. This pilot study involved healthy participants. Finally we address some challenges for future BCI-based rehabilitation.</td>
+</tr>
+<tr id="bib_Silvoni2011" class="bibtex noshow">
+<td colspan="6"><b>BibTeX</b>:
+<pre>
+@article{Silvoni2011,
+  author = {Silvoni, Stefano and Ramos-Murguialday, Ander and Cavinato, Marianna and Volpato, Chiara and Cisotto, Giulia and Turolla, Andrea and Piccione, Francesco and Birbaumer, Niels},
+  title = {Brain-computer interface in stroke: a review of progress},
+  journal = {Clinical EEG and Neuroscience},
+  publisher = {SAGE Publications Sage CA: Los Angeles, CA},
+  year = {2011},
+  volume = {42},
+  number = {4},
+  pages = {245--252},
+  doi = {http://dx.doi.org/10.1177/155005941104200410}
+}
+</pre></td>
+</tr>
+<tr id="Wolpaw2002" class="entry">
+	<td>Wolpaw, J.R., Birbaumer, N., McFarland, D.J., Pfurtscheller, G. and Vaughan, T.M.</td>
+	<td>Brain--computer interfaces for communication and control <p class="infolinks">[<a href="javascript:toggleInfo('Wolpaw2002','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('Wolpaw2002','bibtex')">BibTeX</a>]</p></td>
+	<td>2002</td>
+	<td>Clinical neurophysiology<br/>Vol. 113(6), pp. 767-791&nbsp;</td>
+	<td>article</td>
+	<td><a href="www.elsevier.com/locate/clinph">URL</a>&nbsp;</td>
+</tr>
+<tr id="abs_Wolpaw2002" class="abstract noshow">
+	<td colspan="6"><b>Abstract</b>: For many years people have speculated that electroencephalographic activity or other electrophysiological measures of brain function might provide a new non-muscular channel for sending messages and commands to the external world â a brainâcomputer interface (BCI). Over the past 15 years, productive BCI research programs have arisen. Encouraged by new understanding of brain function, by the advent of powerful low-cost computer equipment, and by growing recognition of the needs and potentials of people with disabilities, these programs concentrate on developing new augmentative communication and control technology for those with severe neuromuscular disorders, such as amyotrophic lateral sclerosis, brainstem stroke, and spinal cord injury. The immediate goal is to provide these users, who may be completely paralyzed, or 'locked in', with basic communication capabilities so that they can express their wishes to caregivers or even operate word processing programs or neuroprostheses. Present-day BCIs determine the intent of the user from a variety of different electrophysiological signals. These signals include slow cortical potentials, P300 potentials, and mu or beta rhythms recorded from the scalp, and cortical neuronal activity recorded by implanted electrodes. They are translated in real-time into commands that operate a computer display or other device. Successful operation requires that the user encode commands in these signals and that the BCI derive the commands from the signals. Thus, the user and the BCI system need to adapt to each other both initially and continually so as to ensure stable performance. Current BCIs have maximum information transfer rates up to 10â25 bits/min. This limited capacity can be valuable for people whose severe disabilities prevent them from using conventional augmentative communication methods. At the same time, many possible applications of BCI technology, such as neuroprosthesis control, may require higher information transfer rates. Future progress will depend on: recognition that BCI research and development is an interdisciplinary problem, involving neurobiology, psychology, engineering, mathematics, and computer science; identi-fication of those signals, whether evoked potentials, spontaneous rhythms, or neuronal firing rates, that users are best able to control independent of activity in conventional motor output pathways; development of training methods for helping users to gain and maintain that control; delineation of the best algorithms for translating these signals into device commands; attention to the identification and elimination of artifacts such as electromyographic and electro-oculographic activity; adoption of precise and objective procedures for evaluating BCI performance; recognition of the need for long-term as well as short-term assessment of BCI performance; identification of appropriate BCI applications and appropriate matching of applications and users; and attention to factors that affect user acceptance of augmentative technology, including ease of use, cosmesis, and provision of those communication and control capacities that are most important to the user. Development of BCI technology will also benefit from greater emphasis on peer-reviewed research publications and avoidance of the hyperbolic and often misleading media attention that tends to generate unrealistic expectations in the public and skepticism in other researchers. With adequate recognition and effective engagement of all these issues, BCI systems could eventually provide an important new communication and control option for those with motor disabilities and might also give those without disabilities a supple-mentary control channel or a control channel useful in special circumstances. q</td>
+</tr>
+<tr id="bib_Wolpaw2002" class="bibtex noshow">
+<td colspan="6"><b>BibTeX</b>:
+<pre>
+@article{Wolpaw2002,
+  author = {Wolpaw, Jonathan R and Birbaumer, Niels and McFarland, Dennis J and Pfurtscheller, Gert and Vaughan, Theresa M},
+  title = {Brain--computer interfaces for communication and control},
+  journal = {Clinical neurophysiology},
+  publisher = {Elsevier},
+  year = {2002},
+  volume = {113},
+  number = {6},
+  pages = {767--791},
+  url = {www.elsevier.com/locate/clinph}
+}
+</pre></td>
+</tr>
+<tr id="Yamins2016" class="entry">
+	<td>Yamins, D.L.K. and DiCarlo, J.J.</td>
+	<td>Using goal-driven deep learning models to understand sensory cortex <p class="infolinks">[<a href="javascript:toggleInfo('Yamins2016','abstract')">Abstract</a>] [<a href="javascript:toggleInfo('Yamins2016','bibtex')">BibTeX</a>]</p></td>
+	<td>2016</td>
+	<td>Nature Neuroscience<br/>Vol. 19, pp. 356-365&nbsp;</td>
+	<td>article</td>
+	<td><a href="http://dx.doi.org/10.1038/nn.4244">DOI</a> <a href="http://www.nature.com/neuro/journal/v19/n3/pdf/nn.4244.pdf">URL</a>&nbsp;</td>
+</tr>
+<tr id="abs_Yamins2016" class="abstract noshow">
+	<td colspan="6"><b>Abstract</b>: Fueled by innovation in the computer vision and artificial intelligence communities, recent developments in computational neuroscience have used goal-driven hierarchical convolutional neural networks (HCNNs) to make strides in modeling neural single-unit and population responses in higher visual cortical areas. In this Perspective, we review the recent progress in a broader modeling context and describe some of the key technical innovations that have supported it. We then outline how the goal-driven HCNN approach can be used to delve even more deeply into understanding the development and organization of sensory cortical processing.</td>
+</tr>
+<tr id="bib_Yamins2016" class="bibtex noshow">
+<td colspan="6"><b>BibTeX</b>:
+<pre>
+@article{Yamins2016,
+  author = {Yamins, Daniel L K and DiCarlo, James J},
+  title = {Using goal-driven deep learning models to understand sensory cortex},
+  journal = {Nature Neuroscience},
+  year = {2016},
+  volume = {19},
+  pages = {356--365},
+  url = {http://www.nature.com/neuro/journal/v19/n3/pdf/nn.4244.pdf},
+  doi = {http://dx.doi.org/10.1038/nn.4244}
+}
+</pre></td>
+</tr>
+</tbody>
+</table>
+<footer>
+ <small>Created by <a href="http://jabref.sourceforge.net">JabRef</a> on 09/06/2017.</small>
+</footer>
+<!-- file generated by JabRef -->
+</body>
+</html>
